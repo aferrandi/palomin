@@ -26,13 +26,15 @@ main =
 
 type alias XY = { x : Int, y : Int }
 
+type alias XYFloat = { x : Float, y : Float }
+
 
 type Direction = Left | Right | None
 
 type alias Model =
   {
-  lastStep : Int,
-  lastScreenUpdate : Int, 
+  lastStep : Float,
+  lastScreenUpdate : Float, 
   size : XY,
   man : XY,  
   bombs : List XY, 
@@ -47,8 +49,8 @@ type alias Model =
 
 initialModel : Model
 initialModel = {
-      lastStep = -1,
-      lastScreenUpdate = -1,
+      lastStep = -1.0,
+      lastScreenUpdate = -1.0,
       size =  { x = 40, y = 25 } ,
       man = { x = 20, y= 24 }, 
       bombs = [],
@@ -63,7 +65,7 @@ initialModel = {
 
 init : (Model, Cmd Msg)
 init = let model = initialModel 
-           generated = Random.generate Initial (RandomList.shuffle (allCells model.size))
+           generated = Random.generate Initial (RandomList.shuffle (rangeCells model.size))
        in (model, generated)
     
 
@@ -95,10 +97,10 @@ handleInitial model allRandoms =
 
 handleTick : Model -> Time ->  Model
 handleTick model t = 
-    let newMs =  Time.inMilliseconds t |> truncate
-        modelWithSteps m = if newMs - model.lastStep > 500 then moveAndCheck { m | lastStep = newMs } 
+    let newMs =  Time.inMilliseconds t
+        modelWithSteps m = if newMs - model.lastStep > 500.0 then moveAndCheck { m | lastStep = newMs } 
                            else m
-        modelWithScreenUpdate m = if newMs - model.lastScreenUpdate > 15000 then makeBombsAndCherries { m | lastScreenUpdate = newMs } 1
+        modelWithScreenUpdate m = if newMs - model.lastScreenUpdate > 15000.0 then makeBombsAndCherries { m | lastScreenUpdate = newMs } 1
                                   else m                        
     in  modelWithScreenUpdate (modelWithSteps model)
     
@@ -109,26 +111,26 @@ eat : Model -> Bool
 eat model = List.any (\b -> b == model.man) model.cherries
            
            
-moveY : XY -> Int -> Int
-moveY size y = if y <= 0 then size.y - 1
+moveY : Int -> Int -> Int
+moveY sizeY y = if y <= 0 then sizeY - 1
                   else y - 1
                   
                   
-moveX : XY -> Int -> Direction -> Int
-moveX size x d = case d of
-                      Left -> if x <= 0 then size.x - 1
+moveX : Int -> Int -> Direction -> Int
+moveX sizeX x d = case d of
+                      Left -> if x <= 0 then sizeX - 1
                               else x - 1                        
-                      Right -> if x >= size.x - 1 then 0
+                      Right -> if x >= sizeX - 1 then 0
                          else x + 1
                       None -> x                  
                       
 move : Model -> Model
 move model =
-    let moveMan man = { man | 
-            x = moveX model.size model.man.x model.direction, 
-            y = moveY model.size model.man.y  
+    let moveMan man = { 
+            x = moveX model.size.x man.x model.direction, 
+            y = moveY model.size.y man.y  
         }
-    in { model | man = moveMan model.man, direction = None }
+    in { model | man = moveMan model.man , direction = None }
 
 moveAndCheck : Model -> Model
 moveAndCheck model = 
@@ -140,6 +142,15 @@ moveAndCheck model =
            cherries = List.filter (\b -> b /= moved.man) moved.cherries 
            } 
        else { moved | eaten = False }
+
+makeBombsAndCherries : Model -> Int -> Model
+makeBombsAndCherries model n = 
+    let addBomb m b =  { m | bombs = m.bombs ++ b }
+        addCherry m c =  { m | cherries = m.cherries ++ c }
+        makeBombs m = extractNRandoms m n addBomb  
+        makeCherries m = extractNRandoms m n addCherry 
+    in makeBombs model |> makeCherries
+
 
 -- SUBSCRIPTIONS
 
@@ -162,22 +173,15 @@ view model =
 
 exploded : Model -> Html Msg
 exploded model = div[] [
-        play "http://soundbible.com/grab.php?id=1986&type=mp3",
+        playSound "http://soundbible.com/grab.php?id=1986&type=mp3",
         text "BOOM!"
         ]
         
 eaten : Model -> List (Html Msg)
-eaten model = if model.eaten then [play "http://soundbible.com/grab.php?id=2067&type=mp3"]
+eaten model = if model.eaten then [playSound "http://soundbible.com/grab.php?id=2067&type=mp3"]
               else []
       
-play : String -> Html Msg
-play s = audio [ 
-      src s,
-      controls False,
-      autoplay True
-      ] []
-
-
+-- TEXTVIEW 
 
 viewAsText : Model -> Html Msg
 viewAsText model = 
@@ -198,46 +202,62 @@ displayCell model xy = if model.man == xy then 'O'
           else if List.member xy model.cherries then '+'
           else '_'
 
+-- GRAPHICVIEW
+
+xyToFloat : XY -> XYFloat 
+xyToFloat xy = { x = Basics.toFloat xy.x,  y = Basics.toFloat xy.y }
+
+centerXY : XYFloat -> XYFloat -> XYFloat
+centerXY size xy =  let center sizeV v = v - sizeV / 2.0 
+                    in { x = center size.x xy.x, y = center size.y xy.y  }
+                    
+xyToTuple : XYFloat -> (Float, Float)
+xyToTuple xy = (xy.x, xy.y)
+
+moveXY : XYFloat -> Collage msg -> XYFloat ->  Collage msg
+moveXY size img xy = let oppositeSideY xy =  { x = xy.x, y = size.y - xy.y }     
+                         center xy  = centerXY size xy
+                     in shift (oppositeSideY xy |> center |> xyToTuple) img
+
+border : XYFloat -> Collage msg
+border size = let toBorder r = outlined { defaultLineStyle | thickness = ultrathin } r
+              in rectangle (size.x + 1.0) (size.y + 1.0) |> toBorder |> shift (-0.5, 0.5)
+
 viewGraphic : Model -> Html Msg
 viewGraphic model =
-    let sizex = Basics.toFloat model.size.x
-        sizey = Basics.toFloat model.size.y
+    let size = xyToFloat model.size
         uiImage src = image (1.0, 1.0) src
         bombImage = uiImage "https://openclipart.org/download/191907/pAK004-boom.svg"
         cherryImage = uiImage "https://openclipart.org/download/183893/simple-apple.svg"
         manImage = uiImage "https://openclipart.org/download/201867/cutecat2.svg"
-        uiBombs =  List.map (\xy -> bombImage |> moveXY xy)  model.bombs
-        uiCherries =  List.map (\xy -> cherryImage |> moveXY xy)  model.cherries
-        uiMan = manImage |> moveXY model.man  
-        rect = rectangle  (sizex + 1.0) (sizey + 1.0) |> outlined { defaultLineStyle | thickness = ultrathin } |> shift (-0.5, 0.5)
-        oppositeSideY y =  sizey - y     
-        centerX x = x - sizex / 2.0
-        centerY y = y - sizey / 2.0
-        moveXY xy img = move (Basics.toFloat xy.x) (Basics.toFloat xy.y) img 
-        move x y img = shift (centerX x, oppositeSideY y |> centerY) img
-        uiItems = uiBombs ++ uiCherries ++ [uiMan, rect ] 
+        moveImg img xy  = moveXY size img (xyToFloat xy)  
+        uiBombs =  List.map (moveImg bombImage)  model.bombs
+        uiCherries =  List.map (moveImg cherryImage)  model.cherries
+        uiMan = moveImg manImage model.man        
+        uiItems = uiBombs ++ uiCherries ++ [uiMan, border size] 
     in group uiItems     
         |> scale 20
         |> svg    
+
     
 -- UTIL
 
-makeBombsAndCherries : Model -> Int -> Model
-makeBombsAndCherries model n = 
-    let addBomb m b =  { m | bombs = m.bombs ++ b }
-        addCherry m c =  { m | cherries = m.cherries ++ c }
-        makeBombs m = getRandoms m n addBomb  
-        makeCherries m = getRandoms m n addCherry 
-    in makeBombs model |> makeCherries
-
-getRandoms : Model -> Int -> (Model -> List XY -> Model) -> Model
-getRandoms model l changeModel= 
+extractNRandoms : Model -> Int -> (Model -> List XY -> Model) -> Model
+extractNRandoms model l changeModel= 
     let randoms = model.randoms
         updated = { model | randoms = drop l randoms }        
     in  changeModel updated (take l randoms)   
 
-allCells : XY -> List XY
-allCells size = 
+playSound : String -> Html Msg
+playSound s = audio [ 
+      src s,
+      controls False,
+      autoplay True
+      ] []
+
+
+rangeCells : XY -> List XY
+rangeCells size = 
     let values n = List.range 0 (n - 1)
     in List.concatMap (\y -> List.map (\x -> XY x y) (values size.x)) (values size.y)  
 
