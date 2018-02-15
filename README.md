@@ -9,7 +9,7 @@ It is a structurally simple game, The only complex sections of the code are:
 * the one that generates random values, because Elm is a functional language and generating random values is based on side effects.
 * the graphical rendering, which needs some mathematical notions.
 
-The plan is to use [Ellie](https://ellie-app.com) and, starting with a simple skeleton of an Elm program, incrementally add parts to it: 
+The plan is to use [Ellie](https://ellie-app.com) and, starting with a simple **skeleton** of an Elm program, incrementally add parts to it: 
 1. add the state (man, bombs, fruits)
 2. add a textual version of the view
 3. add the keys handling
