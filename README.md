@@ -17,6 +17,6 @@ The plan is to use [Ellie](https://ellie-app.com) and, starting with a simple **
 5. add the rest of the game logic
 6. use a graphical version of the view
 
-Here is a picture of the final result:
+Here is a picture of the final result. You have to imagine the cat/man moving always upward and the user moving it right or left with the arrow keys.
 
 ![palomin](docs/palomin.png)
