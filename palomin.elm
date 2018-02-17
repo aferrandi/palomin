@@ -21,13 +21,11 @@ main =
     , subscriptions = subscriptions
     }
 
-
 -- MODEL
 
 type alias XY = { x : Int, y : Int }
 
 type alias XYFloat = { x : Float, y : Float }
-
 
 type Direction = Left | Right | None
 
@@ -45,7 +43,6 @@ type alias Model =
   eaten : Bool,
   randoms : List XY
   }
-  
 
 initialModel : Model
 initialModel = {
@@ -62,12 +59,10 @@ initialModel = {
       randoms = []
     }
 
-
 init : (Model, Cmd Msg)
 init = let model = initialModel 
-           generated = Random.generate Initial (RandomList.shuffle (rangeCells model.size))
-       in (model, generated)
-    
+           generateAllCellsInRandomOrder = Random.generate Initial (RandomList.shuffle (rangeCells model.size))
+       in (model, generateAllCellsInRandomOrder)    
 
 -- UPDATE
 
@@ -109,8 +104,7 @@ boom model = List.any (\b -> b == model.man) model.bombs
 
 eat : Model -> Bool
 eat model = List.any (\b -> b == model.man) model.cherries
-           
-           
+                     
 moveY : Int -> Int -> Int
 moveY sizeY y = if y <= 0 then sizeY - 1
                   else y - 1
@@ -150,7 +144,6 @@ makeBombsAndCherries model n =
         makeBombs m = extractNRandoms m n addBomb  
         makeCherries m = extractNRandoms m n addCherry 
     in makeBombs model |> makeCherries
-
 
 -- SUBSCRIPTIONS
 
@@ -207,17 +200,17 @@ displayCell model xy = if model.man == xy then 'O'
 xyToFloat : XY -> XYFloat 
 xyToFloat xy = { x = Basics.toFloat xy.x,  y = Basics.toFloat xy.y }
 
-centerXY : XYFloat -> XYFloat -> XYFloat
-centerXY size xy =  let center sizeV v = v - sizeV / 2.0 
+centerXYFloat : XYFloat -> XYFloat -> XYFloat
+centerXYFloat size xy =  let center sizeV v = v - sizeV / 2.0 
                     in { x = center size.x xy.x, y = center size.y xy.y  }
                     
-xyToTuple : XYFloat -> (Float, Float)
-xyToTuple xy = (xy.x, xy.y)
+xyFloatToTuple : XYFloat -> (Float, Float)
+xyFloatToTuple xy = (xy.x, xy.y)
 
-moveXY : XYFloat -> Collage msg -> XYFloat ->  Collage msg
-moveXY size img xy = let oppositeSideY xy =  { x = xy.x, y = size.y - xy.y }     
-                         center xy  = centerXY size xy
-                     in shift (oppositeSideY xy |> center |> xyToTuple) img
+moveXYFloat : XYFloat -> Collage msg -> XYFloat ->  Collage msg
+moveXYFloat size img xy = let oppositeSideY xy =  { x = xy.x, y = size.y - xy.y }     
+                              center xy  = centerXYFloat size xy
+                          in shift (oppositeSideY xy |> center |> xyFloatToTuple) img
 
 border : XYFloat -> Collage msg
 border size = let toBorder r = outlined { defaultLineStyle | thickness = ultrathin } r
@@ -230,7 +223,7 @@ viewGraphic model =
         bombImage = uiImage "https://openclipart.org/download/191907/pAK004-boom.svg"
         cherryImage = uiImage "https://openclipart.org/download/183893/simple-apple.svg"
         manImage = uiImage "https://openclipart.org/download/201867/cutecat2.svg"
-        moveImg img xy  = moveXY size img (xyToFloat xy)  
+        moveImg img xy  = moveXYFloat size img (xyToFloat xy)  
         uiBombs =  List.map (moveImg bombImage)  model.bombs
         uiCherries =  List.map (moveImg cherryImage)  model.cherries
         uiMan = moveImg manImage model.man        
